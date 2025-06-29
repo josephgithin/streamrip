@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  streamrip-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: streamrip-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount streamrip config directory
+      - ./config:/app/config
+      # Mount downloads directory
+      - ./downloads:/app/downloads
+      # Mount logs directory
+      - ./logs:/app/logs
+      # Optional: Mount existing streamrip config
+      - ~/.config/streamrip:/home/app/.config/streamrip:ro
+    environment:
+      # API Configuration
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - DEBUG=true
+      
+      # CORS Configuration
+      - CORS_ORIGINS=http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000
+      
+      # WebSocket Configuration
+      - WS_HEARTBEAT_INTERVAL=30
+      - WS_MAX_QUEUE_SIZE=1000
+      
+      # Streamrip Configuration
+      - STREAMRIP_CONFIG_PATH=/app/config/config.toml
+      
+    restart: unless-stopped
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  default:
+    name: streamrip-backend-network

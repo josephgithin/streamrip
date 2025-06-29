@@ -1,0 +1,57 @@
+# Backend-only Docker build for Streamrip Web Interface
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PATH="/app/venv/bin:$PATH"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    ffmpeg \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN useradd --create-home --shell /bin/bash app
+
+# Set working directory
+WORKDIR /app
+
+# Create virtual environment
+RUN python -m venv /app/venv
+
+# Copy backend requirements
+COPY backend/requirements.txt ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Install streamrip
+RUN pip install --no-cache-dir streamrip
+
+# Copy backend source code
+COPY backend/ ./
+
+# Create necessary directories
+RUN mkdir -p /app/config /app/config/backups /app/downloads /app/logs /app/static && \
+    chown -R app:app /app
+
+# Create a simple static index.html for testing
+RUN echo '<html><head><title>Streamrip Web Interface</title></head><body><h1>🎵 Streamrip Web Interface</h1><p>Backend is running! Visit <a href="/api/docs">/api/docs</a> for API documentation.</p></body></html>' > /app/static/index.html
+
+# Switch to app user
+USER app
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
+
+# Start command
+CMD ["python", "main.py"]
