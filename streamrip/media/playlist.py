@@ -73,10 +73,30 @@ class PendingPlaylistTrack(Pending):
         if c.set_playlist_to_album:
             album.album = self.playlist_name
 
+        # Determine the folder path based on configuration
+        folder = self.folder
+        if c.organize_playlist_by_albums:
+            # Create artist/album folder structure
+            downloads_folder = self.config.session.downloads.folder
+            artist_folder = os.path.join(downloads_folder, clean_filepath(album.albumartist))
+            album_folder = os.path.join(artist_folder, clean_filepath(album.album))
+
+            # Create the folder structure
+            os.makedirs(album_folder, exist_ok=True)
+
+            # If disc subdirectories are enabled and the album has multiple discs
+            if self.config.session.downloads.disc_subdirectories and album.disctotal > 1:
+                folder = os.path.join(album_folder, f"Disc {meta.discnumber}")
+                os.makedirs(folder, exist_ok=True)
+            else:
+                folder = album_folder
+
+            logger.debug(f"Organizing playlist track in artist/album structure: {folder}")
+
         quality = self.config.session.get_source(self.client.source).quality
         try:
             embedded_cover_path, downloadable = await asyncio.gather(
-                self._download_cover(album.covers, self.folder),
+                self._download_cover(album.covers, folder),
                 self.client.get_downloadable(self.id, quality),
             )
         except NonStreamableError as e:
@@ -88,7 +108,7 @@ class PendingPlaylistTrack(Pending):
             meta,
             downloadable,
             self.config,
-            self.folder,
+            folder,
             embedded_cover_path,
             self.db,
         )
@@ -195,6 +215,10 @@ class PendingPlaylist(Pending):
         parent = self.config.session.downloads.folder
         folder = os.path.join(parent, clean_filepath(name))
 
+        # Create the folder if it doesn't exist and we're not using artist/album structure
+        if not self.config.session.metadata.organize_playlist_by_albums:
+            os.makedirs(folder, exist_ok=True)
+
         track_ids = meta.ids()
         if not track_ids:
             logger.warning(f"No available tracks to download in playlist '{name}'")
@@ -277,7 +301,12 @@ class PendingLastfmPlaylist(Pending):
             results: list[tuple[str | None, bool]] = await asyncio.gather(*requests)
 
         parent = self.config.session.downloads.folder
+        # Create a folder for the playlist
         folder = os.path.join(parent, clean_filepath(playlist_title))
+
+        # Create the folder if it doesn't exist and we're not using artist/album structure
+        if not self.config.session.metadata.organize_playlist_by_albums:
+            os.makedirs(folder, exist_ok=True)
 
         pending_tracks = []
         for pos, (id, from_fallback) in enumerate(results, start=1):
