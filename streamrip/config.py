@@ -159,10 +159,11 @@ class MetadataConfig:
     # position in the playlist instead of its position in its album
     renumber_playlist_tracks: bool
     # When downloading playlists, organize tracks by artist/album instead of in a single playlist folder
-    organize_playlist_by_albums: bool = False
     # The following metadata tags won't be applied
     # See https://github.com/nathom/streamrip/wiki/Metadata-Tag-Names for more info
     exclude: list[str]
+    # When downloading playlists, organize tracks by artist/album instead of in a single playlist folder
+    organize_playlist_by_albums: bool
 
 
 @dataclass(slots=True)
